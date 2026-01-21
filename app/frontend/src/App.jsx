@@ -118,7 +118,7 @@ function TokenList({ tokens, loading }) {
         </thead>
         <tbody>
           {tokens.map((token) => {
-            const change = token.price_change_percent || 0
+            const change = Number(token.price_change_percent) || 0
             const isPositive = change >= 0
             const isBigWin = change > 100
             const isRug = change < -90
@@ -148,8 +148,8 @@ function TokenList({ tokens, loading }) {
                 </td>
                 <td className="py-4">
                   {token.pnl_sol !== undefined && token.pnl_sol !== null ? (
-                    <span className={`font-medium ${token.pnl_sol >= 0 ? 'text-brand-500' : 'text-red-500'}`}>
-                      {token.pnl_sol >= 0 ? '+' : ''}{token.pnl_sol.toFixed(3)} {token.pnl_currency || 'SOL'}
+                    <span className={`font-medium ${Number(token.pnl_sol) >= 0 ? 'text-brand-500' : 'text-red-500'}`}>
+                      {Number(token.pnl_sol) >= 0 ? '+' : ''}{Number(token.pnl_sol).toFixed(3)} {token.pnl_currency || 'SOL'}
                     </span>
                   ) : (
                     <span className="text-muted">-</span>
@@ -319,19 +319,21 @@ function truncateAddress(address) {
 }
 
 function formatPrice(price) {
-  if (!price) return '-'
-  if (price < 0.00001) return `$${price.toExponential(2)}`
-  if (price < 0.01) return `$${price.toFixed(6)}`
-  if (price < 1) return `$${price.toFixed(4)}`
-  return `$${price.toFixed(2)}`
+  const num = Number(price)
+  if (!num || isNaN(num)) return '-'
+  if (num < 0.00001) return `$${num.toExponential(2)}`
+  if (num < 0.01) return `$${num.toFixed(6)}`
+  if (num < 1) return `$${num.toFixed(4)}`
+  return `$${num.toFixed(2)}`
 }
 
 function formatMcap(mcap) {
-  if (!mcap) return '-'
-  if (mcap >= 1000000000) return `$${(mcap / 1000000000).toFixed(2)}B`
-  if (mcap >= 1000000) return `$${(mcap / 1000000).toFixed(2)}M`
-  if (mcap >= 1000) return `$${(mcap / 1000).toFixed(1)}K`
-  return `$${mcap.toFixed(0)}`
+  const num = Number(mcap)
+  if (!num || isNaN(num)) return '-'
+  if (num >= 1000000000) return `$${(num / 1000000000).toFixed(2)}B`
+  if (num >= 1000000) return `$${(num / 1000000).toFixed(2)}M`
+  if (num >= 1000) return `$${(num / 1000).toFixed(1)}K`
+  return `$${num.toFixed(0)}`
 }
 
 function formatDate(dateStr) {
@@ -382,9 +384,10 @@ function getTokenUrl(token) {
 }
 
 function formatNumber(num) {
-  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
-  if (num >= 1000) return (num / 1000).toFixed(1) + 'K'
-  return num.toFixed(0)
+  const n = Number(num) || 0
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K'
+  return n.toFixed(0)
 }
 
 // Formata lucro perdido em moeda nativa
@@ -392,7 +395,9 @@ function formatMissedProfit(missedProfit) {
   if (!missedProfit) return '0'
 
   // Prioriza mostrar a moeda com maior valor
-  const { SOL = 0, ETH = 0, BNB = 0 } = missedProfit
+  const SOL = Number(missedProfit.SOL) || 0
+  const ETH = Number(missedProfit.ETH) || 0
+  const BNB = Number(missedProfit.BNB) || 0
 
   if (SOL > 0 && SOL >= ETH && SOL >= BNB) {
     return `${SOL.toFixed(2)} SOL`
