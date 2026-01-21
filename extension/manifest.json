@@ -3,6 +3,11 @@
   "name": "Paper Hands",
   "version": "1.0.0",
   "description": "Track tokens you view on Axiom, GMGN, and DexScreener",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "permissions": [
     "storage",
     "activeTab"
@@ -35,6 +40,11 @@
     }
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   }
 }
