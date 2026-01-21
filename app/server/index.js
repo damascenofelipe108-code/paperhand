@@ -180,19 +180,28 @@ app.post('/api/tokens/viewed', async (req, res) => {
       isNewToken = true;
     }
 
-    // Verifica se comprou via API
+    // Verifica se comprou via API ou se tem PNL (PNL = comprou)
     let bought = false;
-    const settings = await db.queryOne('SELECT value FROM settings WHERE user_id = ? AND key = ?', [userId, 'wallets']);
-    if (settings) {
-      try {
-        const wallets = JSON.parse(settings.value);
-        bought = await walletService.checkIfBought(contract_address, chain, wallets, tokenSymbol);
-        if (bought) {
-          await db.run(`UPDATE viewed_tokens SET bought = ${DB_TRUE} WHERE id = ?`, [tokenId]);
-          console.log(`[Token] Compra confirmada para ${tokenSymbol || contract_address.slice(0,8)}`);
+
+    // Se veio PNL da extensão, significa que comprou
+    if (pnl_sol !== null && pnl_sol !== undefined) {
+      bought = true;
+      await db.run(`UPDATE viewed_tokens SET bought = ${DB_TRUE} WHERE id = ?`, [tokenId]);
+      console.log(`[Token] Compra detectada via PNL para ${tokenSymbol || contract_address.slice(0,8)} (PNL: ${pnl_sol} ${pnl_currency || 'SOL'})`);
+    } else {
+      // Senão, verifica via wallet API
+      const settings = await db.queryOne('SELECT value FROM settings WHERE user_id = ? AND key = ?', [userId, 'wallets']);
+      if (settings) {
+        try {
+          const wallets = JSON.parse(settings.value);
+          bought = await walletService.checkIfBought(contract_address, chain, wallets, tokenSymbol);
+          if (bought) {
+            await db.run(`UPDATE viewed_tokens SET bought = ${DB_TRUE} WHERE id = ?`, [tokenId]);
+            console.log(`[Token] Compra confirmada via wallet para ${tokenSymbol || contract_address.slice(0,8)}`);
+          }
+        } catch (e) {
+          console.error('Erro ao verificar compra:', e.message);
         }
-      } catch (e) {
-        console.error('Erro ao verificar compra:', e.message);
       }
     }
 
