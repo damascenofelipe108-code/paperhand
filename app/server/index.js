@@ -209,11 +209,7 @@ app.post('/api/tokens/viewed', async (req, res) => {
                ELSE 0
              END as price_change_percent
       FROM viewed_tokens vt
-      LEFT JOIN (
-        SELECT token_id, price, mcap, MAX(checked_at) as latest
-        FROM price_history
-        GROUP BY token_id
-      ) ph ON ph.token_id = vt.id
+      LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
       WHERE vt.id = ?
     `, [tokenId]);
 
@@ -254,11 +250,7 @@ app.get('/api/tokens/recent', async (req, res) => {
                ELSE 0
              END as price_change_percent
       FROM viewed_tokens vt
-      LEFT JOIN (
-        SELECT token_id, price, mcap, MAX(checked_at) as latest
-        FROM price_history
-        GROUP BY token_id
-      ) ph ON ph.token_id = vt.id
+      LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
       WHERE vt.user_id = ?
       ORDER BY vt.viewed_at DESC
       LIMIT ? OFFSET ?
