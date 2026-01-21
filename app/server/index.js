@@ -26,6 +26,10 @@ if (config.USE_POSTGRES) {
 // Cache de estado de holders para detectar dev dumps
 const holdersStateCache = new Map();
 
+// Valores booleanos compatíveis com o banco de dados
+const DB_TRUE = config.USE_POSTGRES ? 'true' : '1';
+const DB_FALSE = config.USE_POSTGRES ? 'false' : '0';
+
 // WebSocket manager para detecção de transações em tempo real
 let heliusWsManager = null;
 
@@ -184,7 +188,7 @@ app.post('/api/tokens/viewed', async (req, res) => {
         const wallets = JSON.parse(settings.value);
         bought = await walletService.checkIfBought(contract_address, chain, wallets, tokenSymbol);
         if (bought) {
-          await db.run('UPDATE viewed_tokens SET bought = 1 WHERE id = ?', [tokenId]);
+          await db.run(`UPDATE viewed_tokens SET bought = ${DB_TRUE} WHERE id = ?`, [tokenId]);
           console.log(`[Token] Compra confirmada para ${tokenSymbol || contract_address.slice(0,8)}`);
         }
       } catch (e) {
@@ -321,7 +325,7 @@ app.post('/api/tokens/recheck-purchases', async (req, res) => {
     }
 
     const wallets = JSON.parse(settings.value);
-    const tokens = await db.queryAll('SELECT id, contract_address, chain, name, symbol FROM viewed_tokens WHERE user_id = ? AND bought = 0', [userId]);
+    const tokens = await db.queryAll(`SELECT id, contract_address, chain, name, symbol FROM viewed_tokens WHERE user_id = ? AND bought = ${DB_FALSE}`, [userId]);
 
     console.log(`[Recheck] Verificando ${tokens.length} tokens...`);
 
@@ -332,7 +336,7 @@ app.post('/api/tokens/recheck-purchases', async (req, res) => {
 
         if (bought) {
           const pnlData = await walletService.calculateRealizedPnl(token.contract_address, token.chain, wallets, token.symbol || token.name);
-          await db.run('UPDATE viewed_tokens SET bought = 1, pnl_sol = ?, pnl_currency = ? WHERE id = ?', [pnlData.pnl, pnlData.currency, token.id]);
+          await db.run(`UPDATE viewed_tokens SET bought = ${DB_TRUE}, pnl_sol = ?, pnl_currency = ? WHERE id = ?`, [pnlData.pnl, pnlData.currency, token.id]);
           updated++;
 
           const updatedToken = await db.queryOne('SELECT * FROM viewed_tokens WHERE id = ?', [token.id]);
@@ -363,7 +367,7 @@ app.post('/api/tokens/refresh-pnl', async (req, res) => {
     }
 
     const wallets = JSON.parse(settings.value);
-    const tokens = await db.queryAll('SELECT id, contract_address, chain, name, symbol FROM viewed_tokens WHERE user_id = ? AND bought = 1', [userId]);
+    const tokens = await db.queryAll(`SELECT id, contract_address, chain, name, symbol FROM viewed_tokens WHERE user_id = ? AND bought = ${DB_TRUE}`, [userId]);
 
     let updated = 0;
     for (const token of tokens) {
@@ -392,7 +396,7 @@ app.post('/api/tokens/:id/reset-bought', async (req, res) => {
     const userId = getUserId(req);
     const { id } = req.params;
 
-    await db.run('UPDATE viewed_tokens SET bought = 0, pnl_sol = NULL WHERE id = ? AND user_id = ?', [id, userId]);
+    await db.run(`UPDATE viewed_tokens SET bought = ${DB_FALSE}, pnl_sol = NULL WHERE id = ? AND user_id = ?`, [id, userId]);
     if (!config.USE_POSTGRES && db.saveDb) db.saveDb();
 
     const token = await db.queryOne('SELECT * FROM viewed_tokens WHERE id = ? AND user_id = ?', [id, userId]);
@@ -476,19 +480,19 @@ app.get('/api/stats', async (req, res) => {
     });
 
     const devDumpsEvitados = await db.queryOne(`
-      SELECT COUNT(*) as count FROM viewed_tokens WHERE user_id = ? AND dev_dump_detected = 1 AND bought = 0
+      SELECT COUNT(*) as count FROM viewed_tokens WHERE user_id = ? AND dev_dump_detected = ${DB_TRUE} AND bought = ${DB_FALSE}
     `, [userId]);
 
     const rugsEvitados = await db.queryOne(`
       SELECT COUNT(*) as count
       FROM viewed_tokens vt
       LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
-      WHERE vt.user_id = ? AND vt.bought = 0 AND vt.price_when_viewed > 0
+      WHERE vt.user_id = ? AND vt.bought = ${DB_FALSE} AND vt.price_when_viewed > 0
         AND (ph.price < vt.price_when_viewed * 0.5 OR ph.price IS NULL OR ph.price = 0)
     `, [userId]);
 
-    const tradesWon = await db.queryOne(`SELECT COUNT(*) as count FROM viewed_tokens WHERE user_id = ? AND bought = 1 AND pnl_sol > 0`, [userId]);
-    const tradesLost = await db.queryOne(`SELECT COUNT(*) as count FROM viewed_tokens WHERE user_id = ? AND bought = 1 AND pnl_sol < 0`, [userId]);
+    const tradesWon = await db.queryOne(`SELECT COUNT(*) as count FROM viewed_tokens WHERE user_id = ? AND bought = ${DB_TRUE} AND pnl_sol > 0`, [userId]);
+    const tradesLost = await db.queryOne(`SELECT COUNT(*) as count FROM viewed_tokens WHERE user_id = ? AND bought = ${DB_TRUE} AND pnl_sol < 0`, [userId]);
 
     const totalTrades = (tradesWon?.count || 0) + (tradesLost?.count || 0);
     const winRate = totalTrades > 0 ? ((tradesWon?.count || 0) / totalTrades * 100).toFixed(1) : 0;
@@ -537,7 +541,7 @@ app.get('/api/analysis/patterns', async (req, res) => {
 
     const chainPattern = await db.queryAll(`
       SELECT vt.chain, COUNT(*) as total_viewed,
-        SUM(CASE WHEN vt.bought = 0 AND ph.price > vt.price_when_viewed * 2 THEN 1 ELSE 0 END) as missed_2x
+        SUM(CASE WHEN vt.bought = ${DB_FALSE} AND ph.price > vt.price_when_viewed * 2 THEN 1 ELSE 0 END) as missed_2x
       FROM viewed_tokens vt
       LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
       WHERE vt.user_id = ? AND vt.price_when_viewed > 0
@@ -596,14 +600,14 @@ app.get('/api/analysis/score', async (req, res) => {
     const correct = await db.queryOne(`
       SELECT COUNT(*) as count FROM viewed_tokens vt
       LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
-      WHERE vt.user_id = ? AND vt.bought = 0 AND vt.price_when_viewed > 0
+      WHERE vt.user_id = ? AND vt.bought = ${DB_FALSE} AND vt.price_when_viewed > 0
         AND (ph.price < vt.price_when_viewed * 0.5 OR ph.price IS NULL)
     `, [userId]);
 
     const wrong = await db.queryOne(`
       SELECT COUNT(*) as count FROM viewed_tokens vt
       LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
-      WHERE vt.user_id = ? AND vt.bought = 0 AND vt.price_when_viewed > 0 AND ph.price > vt.price_when_viewed * 2
+      WHERE vt.user_id = ? AND vt.bought = ${DB_FALSE} AND vt.price_when_viewed > 0 AND ph.price > vt.price_when_viewed * 2
     `, [userId]);
 
     const c = correct?.count || 0;
@@ -631,7 +635,7 @@ app.get('/api/analysis/missed-profits', async (req, res) => {
         ((ph.price - vt.price_when_viewed) / vt.price_when_viewed) * 100 as change_percent
       FROM viewed_tokens vt
       LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
-      WHERE vt.user_id = ? AND vt.bought = 0 AND vt.price_when_viewed > 0 AND ph.price > vt.price_when_viewed
+      WHERE vt.user_id = ? AND vt.bought = ${DB_FALSE} AND vt.price_when_viewed > 0 AND ph.price > vt.price_when_viewed
       ORDER BY change_percent DESC
       LIMIT 20
     `, [userId]);
@@ -777,12 +781,12 @@ function onHeliusTransaction(txData) {
     if (change.direction === 'BUY') {
       // Busca token não comprado que corresponde
       const tokens = await db.queryAll(
-        'SELECT id, name, symbol, contract_address, user_id FROM viewed_tokens WHERE contract_address = ? AND chain = ? AND bought = 0',
+        `SELECT id, name, symbol, contract_address, user_id FROM viewed_tokens WHERE contract_address = ? AND chain = ? AND bought = ${DB_FALSE}`,
         [change.mint, 'solana']
       );
 
       for (const token of tokens) {
-        await db.run('UPDATE viewed_tokens SET bought = 1 WHERE id = ?', [token.id]);
+        await db.run(`UPDATE viewed_tokens SET bought = ${DB_TRUE} WHERE id = ?`, [token.id]);
         if (!config.USE_POSTGRES && db.saveDb) db.saveDb();
 
         console.log(`[Helius WS] COMPRA DETECTADA: ${token.name || token.symbol || change.mint.slice(0, 8)}`);
