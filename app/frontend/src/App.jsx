@@ -722,17 +722,17 @@ export default function App() {
                 <div className="flex justify-between text-sm">
                   <span className="text-secondary">Maior oportunidade perdida</span>
                   <span className="text-red-500">
-                    {tokens.filter(t => !t.bought)
-                      .sort((a, b) => (b.price_change_percent || 0) - (a.price_change_percent || 0))[0]
-                      ?.price_change_percent?.toFixed(0) || 0}%
+                    {Math.round(Number(tokens.filter(t => !t.bought)
+                      .sort((a, b) => (Number(b.price_change_percent) || 0) - (Number(a.price_change_percent) || 0))[0]
+                      ?.price_change_percent) || 0)}%
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-secondary">Pior rug evitado</span>
                   <span className="text-brand-500">
-                    {Math.abs(tokens.filter(t => !t.bought && t.price_change_percent < 0)
-                      .sort((a, b) => (a.price_change_percent || 0) - (b.price_change_percent || 0))[0]
-                      ?.price_change_percent || 0).toFixed(0)}%
+                    {Math.round(Math.abs(Number(tokens.filter(t => !t.bought && Number(t.price_change_percent) < 0)
+                      .sort((a, b) => (Number(a.price_change_percent) || 0) - (Number(b.price_change_percent) || 0))[0]
+                      ?.price_change_percent) || 0))}%
                   </span>
                 </div>
               </div>
