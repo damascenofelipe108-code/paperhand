@@ -32,9 +32,29 @@ let heliusWsManager = null;
 const app = express();
 const PORT = config.PORT;
 
-// Middleware
+// Middleware - CORS com suporte a extensões Chrome
 app.use(cors({
-  origin: config.CORS_ORIGINS,
+  origin: function(origin, callback) {
+    // Permite requests sem origin (mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+
+    // Permite qualquer extensão Chrome
+    if (origin.startsWith('chrome-extension://')) {
+      return callback(null, true);
+    }
+
+    // Permite origens configuradas
+    if (config.CORS_ORIGINS.some(allowed => origin.startsWith(allowed) || allowed === origin)) {
+      return callback(null, true);
+    }
+
+    // Em desenvolvimento, permite tudo
+    if (config.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+
+    callback(new Error('Bloqueado pelo CORS'));
+  },
   credentials: true
 }));
 app.use(express.json());

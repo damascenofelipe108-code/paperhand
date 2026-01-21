@@ -3,7 +3,7 @@
 // URLs dos servidores
 const SERVERS = {
   local: { api: 'http://localhost:3777/api', dashboard: 'http://localhost:3777' },
-  online: { api: 'https://api.paperhands.app/api', dashboard: 'https://paperhands.app' }
+  railway: { api: 'https://paperhand-production.up.railway.app/api', dashboard: 'https://paperhand-production.up.railway.app' }
 };
 
 // Estado
@@ -149,9 +149,9 @@ async function checkAuth() {
     if (config.apiUrl.includes('localhost')) {
       serverSelect.value = 'local';
       settingsServerSelect.value = 'local';
-    } else if (config.apiUrl.includes('paperhands.app')) {
-      serverSelect.value = 'online';
-      settingsServerSelect.value = 'online';
+    } else if (config.apiUrl.includes('railway.app')) {
+      serverSelect.value = 'railway';
+      settingsServerSelect.value = 'railway';
     } else {
       serverSelect.value = 'custom';
       settingsServerSelect.value = 'custom';

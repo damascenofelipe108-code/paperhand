@@ -21,7 +21,7 @@ module.exports = {
   // CORS
   CORS_ORIGINS: process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',')
-    : ['http://localhost:3778', 'http://localhost:3777', 'chrome-extension://'],
+    : ['http://localhost:3778', 'http://localhost:3777', 'https://paperhand-production.up.railway.app', 'chrome-extension://'],
 
   // Auth
   JWT_SECRET: process.env.JWT_SECRET || 'dev-secret-change-in-production',
