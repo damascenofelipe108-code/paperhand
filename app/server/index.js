@@ -851,10 +851,28 @@ async function initHeliusWebSocket() {
 // Serve frontend estático
 const frontendPath = path.join(__dirname, '..', 'frontend', 'dist');
 if (fs.existsSync(frontendPath)) {
-  app.use(express.static(frontendPath));
-  app.get('*', (req, res) => {
+  console.log('[Frontend] Servindo arquivos estáticos de:', frontendPath);
+  app.use(express.static(frontendPath, {
+    maxAge: '1d',
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript');
+      } else if (filePath.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css');
+      }
+    }
+  }));
+
+  // Catch-all para SPA - apenas para rotas que não são arquivos
+  app.get('*', (req, res, next) => {
+    // Se for uma requisição de API ou arquivo com extensão, pula
+    if (req.path.startsWith('/api') || req.path.includes('.')) {
+      return next();
+    }
     res.sendFile(path.join(frontendPath, 'index.html'));
   });
+} else {
+  console.log('[Frontend] Pasta dist não encontrada:', frontendPath);
 }
 
 // ==================== START ====================
