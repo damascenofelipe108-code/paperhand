@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paper Hands</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0f0f;
+      color: #ffffff;
+    }
+
+    .container {
+      padding: 16px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header h1 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #10B981, #059669);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .settings-btn {
+      background: transparent;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      font-size: 18px;
+    }
+
+    .settings-btn:hover {
+      color: #fff;
+      background: #222;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card {
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #10B981;
+    }
+
+    .stat-value.negative {
+      color: #EF4444;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #1a1a1a;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #EF4444;
+    }
+
+    .status-dot.connected {
+      background: #10B981;
+    }
+
+    .status-text {
+      font-size: 13px;
+      color: #888;
+      flex: 1;
+    }
+
+    .user-name {
+      font-size: 12px;
+      color: #10B981;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #10B981, #059669);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-secondary {
+      background: #222;
+      color: #888;
+      margin-top: 8px;
+    }
+
+    .btn-secondary:hover {
+      background: #333;
+      color: #fff;
+    }
+
+    .recent {
+      margin-top: 16px;
+    }
+
+    .recent-title {
+      font-size: 12px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .recent-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #222;
+    }
+
+    .recent-item:last-child {
+      border-bottom: none;
+    }
+
+    .token-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .token-name {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .token-chain {
+      font-size: 11px;
+      color: #666;
+    }
+
+    .token-change {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .token-change.positive {
+      color: #10B981;
+    }
+
+    .token-change.negative {
+      color: #EF4444;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+      font-size: 13px;
+    }
+
+    /* Login Form */
+    .login-container {
+      padding: 16px;
+      display: none;
+    }
+
+    .login-container.active {
+      display: block;
+    }
+
+    .login-title {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .login-title h2 {
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    .login-title p {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 6px;
+    }
+
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 10px 12px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: #10B981;
+    }
+
+    .form-group select {
+      cursor: pointer;
+    }
+
+    .error-msg {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #EF4444;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-bottom: 12px;
+      display: none;
+    }
+
+    .error-msg.visible {
+      display: block;
+    }
+
+    /* Settings Panel */
+    .settings-panel {
+      padding: 16px;
+      display: none;
+    }
+
+    .settings-panel.active {
+      display: block;
+    }
+
+    .settings-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .back-btn {
+      background: transparent;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      font-size: 20px;
+    }
+
+    .back-btn:hover {
+      color: #fff;
+    }
+
+    .settings-header h2 {
+      font-size: 16px;
+    }
+
+    /* Main Container */
+    .main-container {
+      display: none;
+    }
+
+    .main-container.active {
+      display: block;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- Login View -->
+  <div class="login-container" id="loginView">
+    <div class="login-title">
+      <div class="logo" style="margin: 0 auto 12px; width: 48px; height: 48px; font-size: 24px;">🎯</div>
+      <h2>Paper Hands</h2>
+      <p>Aprenda com seus trades não feitos</p>
+    </div>
+
+    <div class="error-msg" id="loginError"></div>
+
+    <div class="form-group">
+      <label>Servidor</label>
+      <select id="serverSelect">
+        <option value="local">Local (localhost:3777)</option>
+        <option value="online">Online (paperhands.app)</option>
+        <option value="custom">Personalizado</option>
+      </select>
+    </div>
+
+    <div class="form-group hidden" id="customUrlGroup">
+      <label>URL do servidor</label>
+      <input type="text" id="customUrl" placeholder="https://api.exemplo.com">
+    </div>
+
+    <div class="form-group">
+      <label>Seu nome</label>
+      <input type="text" id="loginUsername" placeholder="Digite seu nome">
+    </div>
+
+    <div class="form-group">
+      <label>Senha</label>
+      <input type="password" id="loginPassword" placeholder="Digite a senha">
+    </div>
+
+    <button class="btn btn-primary" id="loginBtn">Entrar</button>
+  </div>
+
+  <!-- Main View -->
+  <div class="main-container" id="mainView">
+    <div class="container">
+      <div class="header">
+        <div class="header-left">
+          <div class="logo">🎯</div>
+          <h1>Paper Hands</h1>
+        </div>
+        <button class="settings-btn" id="settingsBtn" title="Configurações">⚙️</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-label">Vistos Hoje</div>
+          <div class="stat-value" id="viewedToday">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Lucro Perdido</div>
+          <div class="stat-value negative" id="missedProfit">-</div>
+        </div>
+      </div>
+
+      <div class="status">
+        <div class="status-dot" id="statusDot"></div>
+        <span class="status-text" id="statusText">Verificando...</span>
+        <span class="user-name" id="userName"></span>
+      </div>
+
+      <button class="btn btn-primary" id="openDashboard">
+        Abrir Dashboard Completo
+      </button>
+
+      <div class="recent">
+        <div class="recent-title">Últimos Tokens Vistos</div>
+        <div id="recentTokens">
+          <div class="empty-state">Nenhum token rastreado ainda</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings View -->
+  <div class="settings-panel" id="settingsView">
+    <div class="settings-header">
+      <button class="back-btn" id="backBtn">←</button>
+      <h2>Configurações</h2>
+    </div>
+
+    <div class="form-group">
+      <label>Servidor</label>
+      <select id="settingsServerSelect">
+        <option value="local">Local (localhost:3777)</option>
+        <option value="online">Online (paperhands.app)</option>
+        <option value="custom">Personalizado</option>
+      </select>
+    </div>
+
+    <div class="form-group hidden" id="settingsCustomUrlGroup">
+      <label>URL do servidor</label>
+      <input type="text" id="settingsCustomUrl" placeholder="https://api.exemplo.com">
+    </div>
+
+    <button class="btn btn-primary" id="saveSettingsBtn">Salvar</button>
+    <button class="btn btn-secondary" id="logoutBtn">Sair da conta</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(taskkill:*)",
+      "Bash(dir /b \"C:\\\\Users\\\\felipe\\\\regret-minimizer\")",
+      "Bash(npm run dev:*)"
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "Paper Hands",
+  "version": "1.0.0",
+  "description": "Track tokens you view on Axiom, GMGN, and DexScreener",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://axiom.trade/*",
+    "https://gmgn.ai/*",
+    "https://dexscreener.com/*",
+    "https://photon-sol.tinyastro.io/*",
+    "https://bullx.io/*",
+    "http://localhost:3777/*",
+    "https://paperhands.app/*",
+    "https://api.paperhands.app/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://axiom.trade/*",
+        "https://gmgn.ai/*",
+        "https://dexscreener.com/*",
+        "https://photon-sol.tinyastro.io/*",
+        "https://bullx.io/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
