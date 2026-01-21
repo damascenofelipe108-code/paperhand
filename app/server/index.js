@@ -145,10 +145,10 @@ app.post('/api/tokens/viewed', async (req, res) => {
     const tokenMcap = mcap || priceData?.mcap || null;
 
     // Verifica se já existe hoje para este usuário
-    const existing = await db.queryOne(
-      `SELECT id FROM viewed_tokens WHERE user_id = ? AND contract_address = ? AND chain = ? AND date(viewed_at) = date('now')`,
-      [userId, contract_address, chain]
-    );
+    const existingQuery = config.USE_POSTGRES
+      ? `SELECT id FROM viewed_tokens WHERE user_id = ? AND contract_address = ? AND chain = ? AND viewed_at::date = CURRENT_DATE`
+      : `SELECT id FROM viewed_tokens WHERE user_id = ? AND contract_address = ? AND chain = ? AND date(viewed_at) = date('now')`;
+    const existing = await db.queryOne(existingQuery, [userId, contract_address, chain]);
 
     let tokenId;
     let isNewToken = false;
@@ -426,9 +426,10 @@ app.get('/api/stats', async (req, res) => {
   try {
     const userId = getUserId(req);
 
-    const today = await db.queryOne(`
-      SELECT COUNT(*) as count FROM viewed_tokens WHERE user_id = ? AND date(viewed_at) = date('now')
-    `, [userId]);
+    const todayQuery = config.USE_POSTGRES
+      ? `SELECT COUNT(*) as count FROM viewed_tokens WHERE user_id = ? AND viewed_at::date = CURRENT_DATE`
+      : `SELECT COUNT(*) as count FROM viewed_tokens WHERE user_id = ? AND date(viewed_at) = date('now')`;
+    const today = await db.queryOne(todayQuery, [userId]);
 
     const total = await db.queryOne('SELECT COUNT(*) as count FROM viewed_tokens WHERE user_id = ?', [userId]);
 
@@ -517,9 +518,10 @@ app.get('/api/stats', async (req, res) => {
 app.get('/api/stats/today', async (req, res) => {
   try {
     const userId = getUserId(req);
-    const result = await db.queryOne(`
-      SELECT COUNT(*) as tokensViewed FROM viewed_tokens WHERE user_id = ? AND date(viewed_at) = date('now')
-    `, [userId]);
+    const todayQuery = config.USE_POSTGRES
+      ? `SELECT COUNT(*) as tokensViewed FROM viewed_tokens WHERE user_id = ? AND viewed_at::date = CURRENT_DATE`
+      : `SELECT COUNT(*) as tokensViewed FROM viewed_tokens WHERE user_id = ? AND date(viewed_at) = date('now')`;
+    const result = await db.queryOne(todayQuery, [userId]);
     res.json(result || { tokensViewed: 0 });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -551,17 +553,26 @@ app.get('/api/analysis/patterns', async (req, res) => {
       });
     }
 
-    const hourPattern = await db.queryAll(`
-      SELECT strftime('%H', vt.viewed_at) as hour, COUNT(*) as total_viewed,
-        SUM(CASE WHEN vt.bought = 0 AND ph.price > vt.price_when_viewed * 2 THEN 1 ELSE 0 END) as missed_2x
-      FROM viewed_tokens vt
-      LEFT JOIN (SELECT token_id, price, MAX(checked_at) FROM price_history GROUP BY token_id) ph ON ph.token_id = vt.id
-      WHERE vt.user_id = ? AND vt.price_when_viewed > 0
-      GROUP BY strftime('%H', vt.viewed_at)
-      HAVING missed_2x > 0
-      ORDER BY missed_2x DESC
-      LIMIT 3
-    `, [userId]);
+    const hourQuery = config.USE_POSTGRES
+      ? `SELECT EXTRACT(HOUR FROM vt.viewed_at)::text as hour, COUNT(*) as total_viewed,
+          SUM(CASE WHEN vt.bought = false AND ph.price > vt.price_when_viewed * 2 THEN 1 ELSE 0 END) as missed_2x
+        FROM viewed_tokens vt
+        LEFT JOIN (SELECT token_id, price, MAX(checked_at) FROM price_history GROUP BY token_id, price) ph ON ph.token_id = vt.id
+        WHERE vt.user_id = ? AND vt.price_when_viewed > 0
+        GROUP BY EXTRACT(HOUR FROM vt.viewed_at)
+        HAVING SUM(CASE WHEN vt.bought = false AND ph.price > vt.price_when_viewed * 2 THEN 1 ELSE 0 END) > 0
+        ORDER BY missed_2x DESC
+        LIMIT 3`
+      : `SELECT strftime('%H', vt.viewed_at) as hour, COUNT(*) as total_viewed,
+          SUM(CASE WHEN vt.bought = 0 AND ph.price > vt.price_when_viewed * 2 THEN 1 ELSE 0 END) as missed_2x
+        FROM viewed_tokens vt
+        LEFT JOIN (SELECT token_id, price, MAX(checked_at) FROM price_history GROUP BY token_id) ph ON ph.token_id = vt.id
+        WHERE vt.user_id = ? AND vt.price_when_viewed > 0
+        GROUP BY strftime('%H', vt.viewed_at)
+        HAVING missed_2x > 0
+        ORDER BY missed_2x DESC
+        LIMIT 3`;
+    const hourPattern = await db.queryAll(hourQuery, [userId]);
 
     if (hourPattern.length > 0) {
       const worstHours = hourPattern.map(h => `${h.hour}h`).join(', ');
@@ -692,9 +703,10 @@ async function updatePrices() {
 
   try {
     // Busca todos os tokens dos últimos 7 dias (de todos os usuários em produção)
-    const tokens = await db.queryAll(`
-      SELECT id, contract_address, chain, ath_price, ath_mcap, user_id FROM viewed_tokens WHERE viewed_at > datetime('now', '-7 days')
-    `, []);
+    const recentQuery = config.USE_POSTGRES
+      ? `SELECT id, contract_address, chain, ath_price, ath_mcap, user_id FROM viewed_tokens WHERE viewed_at > NOW() - INTERVAL '7 days'`
+      : `SELECT id, contract_address, chain, ath_price, ath_mcap, user_id FROM viewed_tokens WHERE viewed_at > datetime('now', '-7 days')`;
+    const tokens = await db.queryAll(recentQuery, []);
 
     let athUpdates = 0;
     let devDumps = 0;
