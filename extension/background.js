@@ -273,10 +273,57 @@ setInterval(() => {
   fetchStats();
 }, 5 * 60 * 1000);
 
+// Sites suportados para injeção do content script
+const SUPPORTED_SITES = [
+  'https://axiom.trade/*',
+  'https://gmgn.ai/*',
+  'https://dexscreener.com/*',
+  'https://photon-sol.tinyastro.io/*',
+  'https://bullx.io/*'
+];
+
+// Injeta content script em abas já abertas
+async function injectContentScripts() {
+  try {
+    for (const pattern of SUPPORTED_SITES) {
+      const tabs = await chrome.tabs.query({ url: pattern });
+      for (const tab of tabs) {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content.js']
+          });
+          console.log(`[Regret Minimizer] Script injetado na aba: ${tab.url}`);
+        } catch (err) {
+          // Tab pode não estar pronta ou já ter o script
+          console.log(`[Regret Minimizer] Não foi possível injetar em: ${tab.url}`, err.message);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[Regret Minimizer] Erro ao injetar scripts:', error);
+  }
+}
+
+// Quando a extensão é instalada ou atualizada
+chrome.runtime.onInstalled.addListener((details) => {
+  console.log('[Regret Minimizer] Extensão instalada/atualizada:', details.reason);
+  // Injeta scripts em abas já abertas
+  injectContentScripts();
+});
+
+// Quando o service worker inicia (pode ser após idle)
+chrome.runtime.onStartup.addListener(() => {
+  console.log('[Regret Minimizer] Chrome iniciado');
+  injectContentScripts();
+});
+
 // Inicialização
 loadConfig().then(() => {
   syncPendingTokens();
   fetchStats();
+  // Também injeta scripts na inicialização do service worker
+  injectContentScripts();
 });
 
 console.log('[Regret Minimizer] Background service worker iniciado');
