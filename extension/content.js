@@ -321,25 +321,21 @@
         type: 'SAVE_TOKEN',
         data: tokenInfo
       }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.log('[Regret Minimizer] Erro de comunicação:', chrome.runtime.lastError.message);
+          return;
+        }
         if (response && response.success) {
           console.log('[Regret Minimizer] Token registrado:', response.data);
+        } else if (response && response.queued) {
+          console.log('[Regret Minimizer] Token enfileirado para sincronização posterior');
         } else {
-          console.log('[Regret Minimizer] Erro ao registrar, salvando localmente');
-          saveLocally(tokenInfo);
+          console.log('[Regret Minimizer] Erro ao registrar token');
         }
       });
     } catch (error) {
-      console.log('[Regret Minimizer] Erro, salvando localmente');
-      saveLocally(tokenInfo);
+      console.log('[Regret Minimizer] Erro ao enviar token:', error.message);
     }
-  }
-
-  function saveLocally(tokenInfo) {
-    chrome.storage.local.get(['pendingTokens'], (result) => {
-      const pending = result.pendingTokens || [];
-      pending.push(tokenInfo);
-      chrome.storage.local.set({ pendingTokens: pending });
-    });
   }
 
   // Verifica e envia token

@@ -9,15 +9,30 @@ let config = {
 
 // Badge para mostrar tokens vistos
 let tokensViewedToday = 0;
+let badgeDate = null;
 
 // Carrega configuração salva
 async function loadConfig() {
   try {
-    const result = await chrome.storage.local.get(['apiUrl', 'dashboardUrl', 'authToken']);
+    const result = await chrome.storage.local.get(['apiUrl', 'dashboardUrl', 'authToken', 'badgeCount', 'badgeDate']);
     if (result.apiUrl) config.apiUrl = result.apiUrl;
     if (result.dashboardUrl) config.dashboardUrl = result.dashboardUrl;
     if (result.authToken) config.token = result.authToken;
-    console.log('[Regret Minimizer] Config carregada:', config.apiUrl);
+
+    // Carrega badge count (reseta se for um novo dia)
+    const today = new Date().toDateString();
+    if (result.badgeDate === today && result.badgeCount) {
+      tokensViewedToday = result.badgeCount;
+      badgeDate = today;
+      updateBadge(tokensViewedToday);
+    } else {
+      // Novo dia - reseta contador
+      tokensViewedToday = 0;
+      badgeDate = today;
+      await chrome.storage.local.set({ badgeCount: 0, badgeDate: today });
+    }
+
+    console.log('[Regret Minimizer] Config carregada:', config.apiUrl, '- Badge:', tokensViewedToday);
   } catch (error) {
     console.error('[Regret Minimizer] Erro ao carregar config:', error);
   }
@@ -53,10 +68,14 @@ function getAuthHeaders() {
   return headers;
 }
 
-// Atualiza badge
-function updateBadge(count) {
+// Atualiza badge e persiste
+async function updateBadge(count) {
+  tokensViewedToday = count;
   chrome.action.setBadgeText({ text: count > 0 ? count.toString() : '' });
   chrome.action.setBadgeBackgroundColor({ color: '#10B981' });
+  // Persiste para sobreviver ao unload do service worker
+  const today = new Date().toDateString();
+  await chrome.storage.local.set({ badgeCount: count, badgeDate: today });
 }
 
 // Sincroniza tokens pendentes quando backend estiver disponível
@@ -98,11 +117,14 @@ async function fetchStats() {
     });
     if (response.ok) {
       const data = await response.json();
-      tokensViewedToday = data.tokensViewed || 0;
-      updateBadge(tokensViewedToday);
+      const count = data.tokensViewed || 0;
+      console.log('[Regret Minimizer] Stats do servidor:', count, 'tokens hoje');
+      await updateBadge(count);
+    } else {
+      console.log('[Regret Minimizer] Erro ao buscar stats:', response.status);
     }
   } catch (error) {
-    // Backend não disponível
+    console.log('[Regret Minimizer] Backend não disponível para stats');
   }
 }
 
@@ -169,32 +191,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       body: JSON.stringify(message.data)
     })
       .then(res => res.json())
-      .then(data => {
-        tokensViewedToday++;
-        updateBadge(tokensViewedToday);
+      .then(async data => {
+        const newCount = tokensViewedToday + 1;
+        await updateBadge(newCount);
+        console.log('[Regret Minimizer] Token salvo, badge:', newCount);
         sendResponse({ success: true, data });
       })
-      .catch(err => {
+      .catch(async err => {
         console.error('[Regret Minimizer] Erro ao salvar token:', err);
         // Salva para sincronizar depois
-        chrome.storage.local.get(['pendingTokens'], (result) => {
-          const pending = result.pendingTokens || [];
-          pending.push(message.data);
-          chrome.storage.local.set({ pendingTokens: pending });
-        });
+        const result = await chrome.storage.local.get(['pendingTokens']);
+        const pending = result.pendingTokens || [];
+        pending.push(message.data);
+        await chrome.storage.local.set({ pendingTokens: pending });
         sendResponse({ success: false, error: err.message, queued: true });
       });
     return true;
   }
 
   if (message.type === 'TOKEN_VIEWED') {
-    tokensViewedToday++;
-    updateBadge(tokensViewedToday);
-    sendResponse({ success: true });
+    const newCount = tokensViewedToday + 1;
+    updateBadge(newCount).then(() => {
+      sendResponse({ success: true });
+    });
+    return true;
   }
 
   if (message.type === 'GET_STATS') {
     fetchStats().then(() => {
+      console.log('[Regret Minimizer] GET_STATS retornando:', tokensViewedToday);
       sendResponse({ tokensViewedToday });
     });
     return true;
