@@ -32,29 +32,9 @@ let heliusWsManager = null;
 const app = express();
 const PORT = config.PORT;
 
-// Middleware - CORS com suporte a extensões Chrome
+// Middleware - CORS permissivo (app próprio + extensões Chrome)
 app.use(cors({
-  origin: function(origin, callback) {
-    // Permite requests sem origin (mobile apps, curl, etc)
-    if (!origin) return callback(null, true);
-
-    // Permite qualquer extensão Chrome
-    if (origin.startsWith('chrome-extension://')) {
-      return callback(null, true);
-    }
-
-    // Permite origens configuradas
-    if (config.CORS_ORIGINS.some(allowed => origin.startsWith(allowed) || allowed === origin)) {
-      return callback(null, true);
-    }
-
-    // Em desenvolvimento, permite tudo
-    if (config.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
-
-    callback(new Error('Bloqueado pelo CORS'));
-  },
+  origin: true,  // Permite todas as origens
   credentials: true
 }));
 app.use(express.json());
@@ -502,7 +482,7 @@ app.get('/api/stats', async (req, res) => {
     const rugsEvitados = await db.queryOne(`
       SELECT COUNT(*) as count
       FROM viewed_tokens vt
-      LEFT JOIN (SELECT token_id, price, MAX(checked_at) FROM price_history GROUP BY token_id) ph ON ph.token_id = vt.id
+      LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
       WHERE vt.user_id = ? AND vt.bought = 0 AND vt.price_when_viewed > 0
         AND (ph.price < vt.price_when_viewed * 0.5 OR ph.price IS NULL OR ph.price = 0)
     `, [userId]);
@@ -559,7 +539,7 @@ app.get('/api/analysis/patterns', async (req, res) => {
       SELECT vt.chain, COUNT(*) as total_viewed,
         SUM(CASE WHEN vt.bought = 0 AND ph.price > vt.price_when_viewed * 2 THEN 1 ELSE 0 END) as missed_2x
       FROM viewed_tokens vt
-      LEFT JOIN (SELECT token_id, price, MAX(checked_at) FROM price_history GROUP BY token_id) ph ON ph.token_id = vt.id
+      LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
       WHERE vt.user_id = ? AND vt.price_when_viewed > 0
       GROUP BY vt.chain
       ORDER BY missed_2x DESC
@@ -577,7 +557,7 @@ app.get('/api/analysis/patterns', async (req, res) => {
       ? `SELECT EXTRACT(HOUR FROM vt.viewed_at)::text as hour, COUNT(*) as total_viewed,
           SUM(CASE WHEN vt.bought = false AND ph.price > vt.price_when_viewed * 2 THEN 1 ELSE 0 END) as missed_2x
         FROM viewed_tokens vt
-        LEFT JOIN (SELECT token_id, price, MAX(checked_at) FROM price_history GROUP BY token_id, price) ph ON ph.token_id = vt.id
+        LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
         WHERE vt.user_id = ? AND vt.price_when_viewed > 0
         GROUP BY EXTRACT(HOUR FROM vt.viewed_at)
         HAVING SUM(CASE WHEN vt.bought = false AND ph.price > vt.price_when_viewed * 2 THEN 1 ELSE 0 END) > 0
@@ -586,7 +566,7 @@ app.get('/api/analysis/patterns', async (req, res) => {
       : `SELECT strftime('%H', vt.viewed_at) as hour, COUNT(*) as total_viewed,
           SUM(CASE WHEN vt.bought = 0 AND ph.price > vt.price_when_viewed * 2 THEN 1 ELSE 0 END) as missed_2x
         FROM viewed_tokens vt
-        LEFT JOIN (SELECT token_id, price, MAX(checked_at) FROM price_history GROUP BY token_id) ph ON ph.token_id = vt.id
+        LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
         WHERE vt.user_id = ? AND vt.price_when_viewed > 0
         GROUP BY strftime('%H', vt.viewed_at)
         HAVING missed_2x > 0
@@ -615,14 +595,14 @@ app.get('/api/analysis/score', async (req, res) => {
 
     const correct = await db.queryOne(`
       SELECT COUNT(*) as count FROM viewed_tokens vt
-      LEFT JOIN (SELECT token_id, price, MAX(checked_at) FROM price_history GROUP BY token_id) ph ON ph.token_id = vt.id
+      LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
       WHERE vt.user_id = ? AND vt.bought = 0 AND vt.price_when_viewed > 0
         AND (ph.price < vt.price_when_viewed * 0.5 OR ph.price IS NULL)
     `, [userId]);
 
     const wrong = await db.queryOne(`
       SELECT COUNT(*) as count FROM viewed_tokens vt
-      LEFT JOIN (SELECT token_id, price, MAX(checked_at) FROM price_history GROUP BY token_id) ph ON ph.token_id = vt.id
+      LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
       WHERE vt.user_id = ? AND vt.bought = 0 AND vt.price_when_viewed > 0 AND ph.price > vt.price_when_viewed * 2
     `, [userId]);
 
@@ -650,7 +630,7 @@ app.get('/api/analysis/missed-profits', async (req, res) => {
       SELECT vt.*, ph.price as current_price,
         ((ph.price - vt.price_when_viewed) / vt.price_when_viewed) * 100 as change_percent
       FROM viewed_tokens vt
-      LEFT JOIN (SELECT token_id, price, MAX(checked_at) FROM price_history GROUP BY token_id) ph ON ph.token_id = vt.id
+      LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
       WHERE vt.user_id = ? AND vt.bought = 0 AND vt.price_when_viewed > 0 AND ph.price > vt.price_when_viewed
       ORDER BY change_percent DESC
       LIMIT 20
@@ -810,7 +790,7 @@ function onHeliusTransaction(txData) {
         const updatedToken = await db.queryOne(`
           SELECT vt.*, ph.price as current_price, ph.mcap as current_mcap
           FROM viewed_tokens vt
-          LEFT JOIN (SELECT token_id, price, mcap, MAX(checked_at) FROM price_history GROUP BY token_id) ph ON ph.token_id = vt.id
+          LEFT JOIN (SELECT DISTINCT ON (token_id) token_id, price, mcap, checked_at FROM price_history ORDER BY token_id, checked_at DESC) ph ON ph.token_id = vt.id
           WHERE vt.id = ?
         `, [token.id]);
 
