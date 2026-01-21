@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS viewed_tokens (
   current_price DECIMAL(30, 18),
   current_mcap DECIMAL(30, 2),
   viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  viewed_date DATE DEFAULT CURRENT_DATE,
   bought BOOLEAN DEFAULT FALSE,
   source VARCHAR(100),
   url TEXT,
@@ -48,7 +49,7 @@ CREATE TABLE IF NOT EXISTS viewed_tokens (
   dev_dump_detected BOOLEAN DEFAULT FALSE,
   dev_dump_percent DECIMAL(10, 2),
   dev_dump_date TIMESTAMP,
-  UNIQUE(user_id, contract_address, chain, DATE(viewed_at))
+  UNIQUE(user_id, contract_address, chain, viewed_date)
 );
 
 CREATE TABLE IF NOT EXISTS price_history (
@@ -144,11 +145,12 @@ async function run(sql, params = []) {
 
 // Cria ou busca usuário por wallet
 async function getOrCreateUser(walletAddress) {
-  let user = await queryOne('SELECT * FROM users WHERE wallet_address = ?', [walletAddress]);
+  let user = await queryOne('SELECT * FROM users WHERE wallet_solana = ?', [walletAddress]);
 
   if (!user) {
-    const result = await run('INSERT INTO users (wallet_address) VALUES (?)', [walletAddress]);
-    user = { id: result.lastInsertRowid, wallet_address: walletAddress };
+    const result = await run('INSERT INTO users (username, password_hash, wallet_solana) VALUES (?, ?, ?)',
+      [walletAddress.slice(0, 20), 'wallet-login', walletAddress]);
+    user = { id: result.lastInsertRowid, wallet_solana: walletAddress };
   }
 
   return user;
